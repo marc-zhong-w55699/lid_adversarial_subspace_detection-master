@@ -37,64 +37,32 @@ DATA_PATH = "data/"
 np.random.seed(0)
 torch.manual_seed(0)
 
-def get_data(dataset='mnist'):
-    """
-    Load datasets (MNIST, CIFAR-10, or SVHN) normalized to [-0.5, 0.5].
-
-    :param dataset: 'mnist', 'cifar', or 'svhn'
-    :return: X_train, Y_train, X_test, Y_test
-    """
-    assert dataset in ['mnist', 'cifar', 'svhn'], \
-        "Dataset must be 'mnist', 'cifar', or 'svhn'"
-
+def get_data(dataset, batch_size):
     if dataset == 'mnist':
         transform = transforms.Compose([
+            transforms.RandomRotation(20),
+            transforms.RandomResizedCrop(28, scale=(0.8, 1.0)),
+            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,))  # Normalize to [-0.5, 0.5]
+            transforms.Normalize((0.5,), (0.5,))
         ])
-        train_data = MNIST(root=DATA_PATH, train=True, download=True, transform=transform)
-        test_data = MNIST(root=DATA_PATH, train=False, download=True, transform=transform)
-        
-        X_train = train_data.data.unsqueeze(1).float().div(255).sub(0.5)
-        Y_train = train_data.targets.numpy()
-        X_test = test_data.data.unsqueeze(1).float().div(255).sub(0.5)
-        Y_test = test_data.targets.numpy()
-
+        train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
+        test_dataset = datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor(), download=True)
     elif dataset == 'cifar':
         transform = transforms.Compose([
+            transforms.RandomRotation(20),
+            transforms.RandomResizedCrop(32, scale=(0.8, 1.0)),
+            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalize to [-0.5, 0.5]
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
-        train_data = CIFAR10(root=DATA_PATH, train=True, download=True, transform=transform)
-        test_data = CIFAR10(root=DATA_PATH, train=False, download=True, transform=transform)
-        
-        X_train = torch.stack([data[0] for data in train_data])
-        Y_train = np.array([data[1] for data in train_data])
-        X_test = torch.stack([data[0] for data in test_data])
-        Y_test = np.array([data[1] for data in test_data])
-
-    else:  # SVHN
-        if not os.path.isfile(os.path.join(DATA_PATH, "svhn_train.mat")):
-            print('Downloading SVHN train set...')
-            os.system(f"curl -o {DATA_PATH}svhn_train.mat http://ufldl.stanford.edu/housenumbers/train_32x32.mat")
-        if not os.path.isfile(os.path.join(DATA_PATH, "svhn_test.mat")):
-            print('Downloading SVHN test set...')
-            os.system(f"curl -o {DATA_PATH}svhn_test.mat http://ufldl.stanford.edu/housenumbers/test_32x32.mat")
-
-        train_data = loadmat(os.path.join(DATA_PATH, 'svhn_train.mat'))
-        test_data = loadmat(os.path.join(DATA_PATH, 'svhn_test.mat'))
-
-        X_train = np.transpose(train_data['X'], axes=[3, 0, 1, 2]).astype('float32') / 255.0 - (1.0 - CLIP_MAX)
-        X_test = np.transpose(test_data['X'], axes=[3, 0, 1, 2]).astype('float32') / 255.0 - (1.0 - CLIP_MAX)
-        Y_train = train_data['y'].reshape(-1) - 1
-        Y_test = test_data['y'].reshape(-1) - 1
-
-    print("X_train:", X_train.shape)
-    print("Y_train:", Y_train.shape)
-    print("X_test:", X_test.shape)
-    print("Y_test", Y_test.shape)
-
-    return X_train, Y_train, X_test, Y_test
+        train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
+        test_dataset = datasets.CIFAR10(root='./data', train=False, transform=transforms.ToTensor(), download=True)
+    else:
+        raise ValueError("Unsupported dataset. Choose 'mnist' or 'cifar'.")
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    return train_loader, test_loader
 
 
 def get_model(dataset='mnist', softmax=True):
