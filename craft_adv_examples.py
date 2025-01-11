@@ -178,7 +178,7 @@ def main(args):
     train_loader, test_loader  = get_data(args.dataset,args.batch_size)
     x_test, y_test = extract_test_data(test_loader)
     x_test = torch.FloatTensor(x_test).to(device)
-    y_test = torch.FloatTensor(y_test).to(device)
+    y_test = y_test.to(device, dtype=torch.float)
     
     # Evaluate clean accuracy
     acc = evaluate_model(model, x_test, y_test, args.batch_size)
