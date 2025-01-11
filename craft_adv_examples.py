@@ -150,7 +150,7 @@ def main(args):
     assert args.attack in ['fgsm', 'bim-a', 'bim-b', 'jsma', 'cw-l2', 'all', 'cw-lid'], \
         "Attack parameter must be either 'fgsm', 'bim-a', 'bim-b', 'jsma', 'cw-l2', 'all' or 'cw-lid'"
     
-    model_file = os.path.join(PATH_DATA, f"model_{args.dataset}.pt")
+    model_file = os.path.join(PATH_DATA, f"model_{args.dataset}.pth")
     assert os.path.isfile(model_file), \
         'Model file not found... must first train model using train_model.py'
     
