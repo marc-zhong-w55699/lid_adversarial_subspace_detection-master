@@ -63,18 +63,41 @@ def get_data(dataset, batch_size):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
-def extract_test_data(test_loader):
+
+def extract_test_data(dataset,test_loader):
+    """
+    提取测试数据并转换为适合模型输入的格式。
+    支持 MNIST、CIFAR-10 和 SVHN 数据集。
+
+    Args:
+        test_loader (DataLoader): 测试集数据加载器。
+        dataset_name (str): 数据集名称，支持 'mnist'、'cifar'、'svhn'。
+
+    Returns:
+        x_test (torch.Tensor): 测试数据张量。
+        y_test (torch.Tensor): 测试标签张量（独热编码形式）。
+    """
     x_test = []
     y_test = []
     
-    # 遍历 DataLoader
-    for inputs, labels in test_loader:
-        x_test.append(inputs)
-        y_test.append(labels)
+    for batch_x, batch_y in test_loader:
+        x_test.append(batch_x)
+        y_test.append(batch_y)
     
-    # 将所有批次合并为一个 Tensor
+    # 合并批次数据为完整张量
     x_test = torch.cat(x_test, dim=0)
     y_test = torch.cat(y_test, dim=0)
+    
+    # 针对不同数据集进行标签预处理
+    if dataset_name.lower() == 'svhn':
+        # SVHN 数据集中，标签 10 表示数字 0，需要转换为 0
+        y_test = y_test % 10
+    elif dataset_name.lower() not in ['mnist', 'cifar']:
+        raise ValueError(f"Unsupported dataset: {dataset_name}. Use 'mnist', 'cifar', or 'svhn'.")
+    
+    # 独热编码
+    num_classes = torch.max(y_test) + 1  # 自动推断类别数量
+    y_test = F.one_hot(y_test, num_classes=num_classes).float()
     
     return x_test, y_test
 
