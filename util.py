@@ -17,7 +17,7 @@ import torch
 import torchvision
 import torchvision.transforms as transforms
 import numpy as np
-from torchvision.datasets import MNIST, CIFAR10
+from torchvision import datasets, transforms
 from scipy.io import loadmat
 from torch.utils.data import DataLoader
 import torch
