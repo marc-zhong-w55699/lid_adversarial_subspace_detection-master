@@ -175,7 +175,7 @@ def main(args):
     model.eval()
     
     # Load test data
-    _, _, x_test, y_test = get_data(args.dataset)
+    _, _, x_test, y_test = get_data(args.dataset,args.batch_size)
     x_test = torch.FloatTensor(x_test).to(device)
     y_test = torch.FloatTensor(y_test).to(device)
     
