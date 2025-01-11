@@ -37,7 +37,7 @@ DATA_PATH = "data/"
 np.random.seed(0)
 torch.manual_seed(0)
 
-def get_data(dataset='mnist',batch_size):
+def get_data(dataset='mnist'):
     """
     Load datasets (MNIST, CIFAR-10, or SVHN) normalized to [-0.5, 0.5].
 
