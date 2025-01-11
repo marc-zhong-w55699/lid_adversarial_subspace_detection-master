@@ -24,9 +24,9 @@ CLIP_MAX = 0.5
 PATH_DATA = "./data/"
 
 def evaluate_model(model: nn.Module, 
-                  x: torch.Tensor, 
-                  y: torch.Tensor, 
-                  batch_size: int) -> float:
+                   x: torch.Tensor, 
+                   y: torch.Tensor, 
+                   batch_size: int) -> float:
     """Evaluate model accuracy on data."""
     model.eval()
     device = next(model.parameters()).device
@@ -40,11 +40,19 @@ def evaluate_model(model: nn.Module,
             batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             outputs = model(batch_x)
             _, predicted = outputs.max(1)
-            correct += (predicted == batch_y.argmax(1)).sum().item()
+            
+            # 根据 batch_y 的维度决定如何处理
+            if batch_y.ndim == 2:  # 如果是独热编码
+                correct += (predicted == batch_y.argmax(1)).sum().item()
+            elif batch_y.ndim == 1:  # 如果是类别索引
+                correct += (predicted == batch_y).sum().item()
+            else:
+                raise ValueError(f"Unexpected shape for batch_y: {batch_y.shape}")
+            
             total += batch_y.size(0)
     
     return correct / total
-
+                       
 def compute_l2_diff(x_adv: torch.Tensor, x_orig: torch.Tensor) -> float:
     """Compute average L2 perturbation size."""
     diff = (x_adv - x_orig).view(len(x_adv), -1)
