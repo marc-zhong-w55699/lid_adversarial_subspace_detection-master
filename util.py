@@ -71,7 +71,7 @@ def extract_test_data(dataset,test_loader):
 
     Args:
         test_loader (DataLoader): 测试集数据加载器。
-        dataset_name (str): 数据集名称，支持 'mnist'、'cifar'、'svhn'。
+        
 
     Returns:
         x_test (torch.Tensor): 测试数据张量。
@@ -89,11 +89,11 @@ def extract_test_data(dataset,test_loader):
     y_test = torch.cat(y_test, dim=0)
     
     # 针对不同数据集进行标签预处理
-    if dataset_name.lower() == 'svhn':
+    if dataset.lower() == 'svhn':
         # SVHN 数据集中，标签 10 表示数字 0，需要转换为 0
         y_test = y_test % 10
-    elif dataset_name.lower() not in ['mnist', 'cifar']:
-        raise ValueError(f"Unsupported dataset: {dataset_name}. Use 'mnist', 'cifar', or 'svhn'.")
+    elif dataset.lower() not in ['mnist', 'cifar']:
+        raise ValueError(f"Unsupported dataset: {dataset}. Use 'mnist', 'cifar', or 'svhn'.")
     
     # 独热编码
     num_classes = torch.max(y_test) + 1  # 自动推断类别数量
