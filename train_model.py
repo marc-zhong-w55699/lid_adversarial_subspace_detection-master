@@ -10,7 +10,7 @@ from util import get_data, get_model
 # Training function
 def train(dataset='mnist', batch_size=128, epochs=50):
     print(f"Dataset: {dataset}")
-    train_loader, test_loader = get_data(dataset，batch_size)
+    train_loader, test_loader = get_data(dataset,batch_size)
     model = get_model(dataset)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
