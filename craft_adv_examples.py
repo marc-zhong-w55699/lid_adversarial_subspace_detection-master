@@ -184,7 +184,7 @@ def main(args):
     
     # Load test data
     train_loader, test_loader  = get_data(args.dataset,args.batch_size)
-    x_test, y_test = extract_test_data(test_loader)
+    x_test, y_test = extract_test_data(args.dataset,test_loader)
     x_test = torch.FloatTensor(x_test).to(device)
     y_test = y_test.to(device, dtype=torch.float)
     
