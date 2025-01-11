@@ -6,7 +6,7 @@
 python train_model.py -d mnist -e 50 -b 128
 
 ### 2. Craft adversarial examples:
-python craft_adv_samples.py -d cifar -a cw-l2 -b 100
+python craft_adv_examples.py -d cifar -a cw-l2 -b 100
 ### 3.Extract detection characteristics:
 python extract_characteristics.py -d cifar -a cw-l2 -r lid -k 20 -b 100
 
