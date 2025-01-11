@@ -1,4 +1,18 @@
 import os
+import multiprocessing as mp
+from subprocess import call
+import warnings
+import numpy as np
+import scipy.io as sio
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc, roc_auc_score
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.preprocessing import scale
+from scipy.spatial.distance import pdist, cdist, squareform
+from sklearn.decomposition import PCA
+
+
 import torch
 import torchvision
 import torchvision.transforms as transforms
@@ -7,6 +21,7 @@ from torchvision.datasets import MNIST, CIFAR10
 from scipy.io import loadmat
 from torch.utils.data import DataLoader
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 # Constants
 STDEVS = {
@@ -81,108 +96,115 @@ def get_data(dataset='mnist'):
 
     return X_train, Y_train, X_test, Y_test
 
+
 def get_model(dataset='mnist', softmax=True):
     """
-    Takes in a parameter indicating which model type to use ('mnist',
-    'cifar' or 'svhn') and returns the appropriate Keras model.
-    :param dataset: A string indicating which dataset we are building
-                    a model for.
-    :param softmax: if add softmax to the last layer.
-    :return: The model; a Keras 'Sequential' instance.
+    构建 PyTorch 模型，支持 MNIST、CIFAR 和 SVHN 数据集。
+    :param dataset: 数据集名称（'mnist', 'cifar', 或 'svhn'）
+    :param softmax: 是否添加 softmax 到最后一层
+    :return: PyTorch 模型实例
     """
     assert dataset in ['mnist', 'cifar', 'svhn'], \
-        "dataset parameter must be either 'mnist' 'cifar' or 'svhn'"
-    if dataset == 'mnist':
-        # MNIST model: 0, 2, 7, 10
-        layers = [
-            Conv2D(64, (3, 3), padding='valid', input_shape=(28, 28, 1)),  # 0
-            Activation('relu'),  # 1
-            BatchNormalization(), # 2
-            Conv2D(64, (3, 3)),  # 3
-            Activation('relu'),  # 4
-            BatchNormalization(), # 5
-            MaxPooling2D(pool_size=(2, 2)),  # 6
-            Dropout(0.5),  # 7
-            Flatten(),  # 8
-            Dense(128),  # 9            
-            Activation('relu'),  # 10
-            BatchNormalization(), # 11
-            Dropout(0.5),  # 12
-            Dense(10),  # 13
-        ]
-    elif dataset == 'cifar':
-        # CIFAR-10 model
-        layers = [
-            Conv2D(32, (3, 3), padding='same', input_shape=(32, 32, 3)),  # 0
-            Activation('relu'),  # 1
-            BatchNormalization(), # 2
-            Conv2D(32, (3, 3), padding='same'),  # 3
-            Activation('relu'),  # 4
-            BatchNormalization(), # 5
-            MaxPooling2D(pool_size=(2, 2)),  # 6
-            
-            Conv2D(64, (3, 3), padding='same'),  # 7
-            Activation('relu'),  # 8
-            BatchNormalization(), # 9
-            Conv2D(64, (3, 3), padding='same'),  # 10
-            Activation('relu'),  # 11
-            BatchNormalization(), # 12
-            MaxPooling2D(pool_size=(2, 2)),  # 13
-            
-            Conv2D(128, (3, 3), padding='same'),  # 14
-            Activation('relu'),  # 15
-            BatchNormalization(), # 16
-            Conv2D(128, (3, 3), padding='same'),  # 17
-            Activation('relu'),  # 18
-            BatchNormalization(), # 19
-            MaxPooling2D(pool_size=(2, 2)),  # 20
-            
-            Flatten(),  # 21
-            Dropout(0.5),  # 22
-            
-            Dense(1024, kernel_regularizer=l2(0.01), bias_regularizer=l2(0.01)),  # 23
-            Activation('relu'),  # 24
-            BatchNormalization(), # 25
-            Dropout(0.5),  # 26
-            Dense(512, kernel_regularizer=l2(0.01), bias_regularizer=l2(0.01)),  # 27
-            Activation('relu'),  # 28
-            BatchNormalization(), # 29
-            Dropout(0.5),  # 30
-            Dense(10),  # 31
-        ]
-    else:
-        # SVHN model
-        layers = [
-            Conv2D(64, (3, 3), padding='valid', input_shape=(32, 32, 3)),  # 0
-            Activation('relu'),  # 1
-            BatchNormalization(), # 2
-            Conv2D(64, (3, 3)),  # 3
-            Activation('relu'),  # 4
-            BatchNormalization(), # 5
-            MaxPooling2D(pool_size=(2, 2)),  # 6
-            
-            Dropout(0.5),  # 7
-            Flatten(),  # 8
-            
-            Dense(512),  # 9
-            Activation('relu'),  # 10
-            BatchNormalization(), # 11
-            Dropout(0.5),  # 12
-            
-            Dense(128),  # 13
-            Activation('relu'),  # 14
-            BatchNormalization(), # 15
-            Dropout(0.5),  # 16
-            Dense(10),  # 17
-        ]
+        "dataset 参数必须是 'mnist', 'cifar', 或 'svhn'"
 
-    model = Sequential()
-    for layer in layers:
-        model.add(layer)
-    if softmax:
-        model.add(Activation('softmax'))
+    class Model(nn.Module):
+        def __init__(self):
+            super(Model, self).__init__()
+            if dataset == 'mnist':
+                # MNIST 模型
+                self.features = nn.Sequential(
+                    nn.Conv2d(1, 64, kernel_size=3, padding=0),  # 28x28 -> 26x26
+                    nn.ReLU(),
+                    nn.BatchNorm2d(64),
+                    nn.Conv2d(64, 64, kernel_size=3),  # 26x26 -> 24x24
+                    nn.ReLU(),
+                    nn.BatchNorm2d(64),
+                    nn.MaxPool2d(kernel_size=2),  # 24x24 -> 12x12
+                    nn.Dropout(0.5)
+                )
+                self.classifier = nn.Sequential(
+                    nn.Flatten(),
+                    nn.Linear(64 * 12 * 12, 128),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(128),
+                    nn.Dropout(0.5),
+                    nn.Linear(128, 10)
+                )
+            elif dataset == 'cifar':
+                # CIFAR-10 模型
+                self.features = nn.Sequential(
+                    nn.Conv2d(3, 32, kernel_size=3, padding=1),  # 32x32 -> 32x32
+                    nn.ReLU(),
+                    nn.BatchNorm2d(32),
+                    nn.Conv2d(32, 32, kernel_size=3, padding=1),  # 32x32 -> 32x32
+                    nn.ReLU(),
+                    nn.BatchNorm2d(32),
+                    nn.MaxPool2d(kernel_size=2),  # 32x32 -> 16x16
 
-    return model
+                    nn.Conv2d(32, 64, kernel_size=3, padding=1),  # 16x16 -> 16x16
+                    nn.ReLU(),
+                    nn.BatchNorm2d(64),
+                    nn.Conv2d(64, 64, kernel_size=3, padding=1),  # 16x16 -> 16x16
+                    nn.ReLU(),
+                    nn.BatchNorm2d(64),
+                    nn.MaxPool2d(kernel_size=2),  # 16x16 -> 8x8
+
+                    nn.Conv2d(64, 128, kernel_size=3, padding=1),  # 8x8 -> 8x8
+                    nn.ReLU(),
+                    nn.BatchNorm2d(128),
+                    nn.Conv2d(128, 128, kernel_size=3, padding=1),  # 8x8 -> 8x8
+                    nn.ReLU(),
+                    nn.BatchNorm2d(128),
+                    nn.MaxPool2d(kernel_size=2)  # 8x8 -> 4x4
+                )
+                self.classifier = nn.Sequential(
+                    nn.Flatten(),
+                    nn.Dropout(0.5),
+                    nn.Linear(128 * 4 * 4, 1024),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(1024),
+                    nn.Dropout(0.5),
+                    nn.Linear(1024, 512),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(512),
+                    nn.Dropout(0.5),
+                    nn.Linear(512, 10)
+                )
+            else:
+                # SVHN 模型
+                self.features = nn.Sequential(
+                    nn.Conv2d(3, 64, kernel_size=3, padding=0),  # 32x32 -> 30x30
+                    nn.ReLU(),
+                    nn.BatchNorm2d(64),
+                    nn.Conv2d(64, 64, kernel_size=3),  # 30x30 -> 28x28
+                    nn.ReLU(),
+                    nn.BatchNorm2d(64),
+                    nn.MaxPool2d(kernel_size=2),  # 28x28 -> 14x14
+                    nn.Dropout(0.5)
+                )
+                self.classifier = nn.Sequential(
+                    nn.Flatten(),
+                    nn.Linear(64 * 14 * 14, 512),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(512),
+                    nn.Dropout(0.5),
+                    nn.Linear(512, 128),
+                    nn.ReLU(),
+                    nn.BatchNorm1d(128),
+                    nn.Dropout(0.5),
+                    nn.Linear(128, 10)
+                )
+
+        def forward(self, x):
+            x = self.features(x)
+            x = self.classifier(x)
+            if softmax:
+                x = F.softmax(x, dim=1)
+            return x
+
+    # 返回实例化的模型
+    return Model()
+
 
 def cross_entropy(y_true, y_pred):
     """
@@ -312,78 +334,104 @@ def get_noisy_samples(X_test, X_test_adv, dataset, attack):
 
 def get_mc_predictions(model, X, nb_iter=50, batch_size=256):
     """
-    TODO
-    :param model:
-    :param X:
-    :param nb_iter:
-    :param batch_size:
-    :return:
+    使用 PyTorch 模型获取 Monte Carlo (MC) 预测。
+    :param model: PyTorch 模型。
+    :param X: 输入数据，形状为 (N, ...) 的 NumPy 数组。
+    :param nb_iter: MC 采样的迭代次数。
+    :param batch_size: 批大小。
+    :return: MC 预测结果，形状为 (nb_iter, N, output_dim) 的 NumPy 数组。
     """
-    output_dim = model.layers[-1].output.shape[-1].value
-    get_output = K.function(
-        [model.layers[0].input, K.learning_phase()],
-        [model.layers[-1].output]
-    )
+    # 确保模型处于训练模式 (启用 Dropout 等)
+    model.train()
+
+    # 输出维度
+    device = next(model.parameters()).device  # 模型所用设备
+    X = torch.tensor(X, dtype=torch.float32).to(device)  # 将输入数据转为 Tensor 并移动到设备上
+    output_dim = model(torch.rand_like(X[:1])).shape[-1]  # 推测输出维度
 
     def predict():
+        """对整个输入数据进行一次前向传播，返回批次预测值。"""
         n_batches = int(np.ceil(X.shape[0] / float(batch_size)))
-        output = np.zeros(shape=(len(X), output_dim))
+        output = torch.zeros((len(X), output_dim), device=device)
         for i in range(n_batches):
-            output[i * batch_size:(i + 1) * batch_size] = \
-                get_output([X[i * batch_size:(i + 1) * batch_size], 1])[0]
-        return output
+            batch_X = X[i * batch_size:(i + 1) * batch_size]
+            output[i * batch_size:(i + 1) * batch_size] = model(batch_X)
+        return output.cpu().numpy()
 
+    # 进行多次 MC 采样
     preds_mc = []
-    for i in tqdm(range(nb_iter)):
+    for _ in tqdm(range(nb_iter), desc="MC Sampling"):
         preds_mc.append(predict())
 
     return np.asarray(preds_mc)
 
 
+
+
 def get_deep_representations(model, X, batch_size=256):
     """
-    TODO
-    :param model:
-    :param X:
-    :param batch_size:
-    :return:
+    获取深度表示（从指定隐藏层提取特征）。
+    :param model: PyTorch 模型。
+    :param X: 输入数据，形状为 (N, ...) 的 NumPy 数组。
+    :param batch_size: 批大小。
+    :return: 提取的深度表示，形状为 (N, output_dim) 的 NumPy 数组。
     """
-    # last hidden layer is always at index -4
-    output_dim = model.layers[-4].output.shape[-1].value
-    get_encoding = K.function(
-        [model.layers[0].input, K.learning_phase()],
-        [model.layers[-4].output]
-    )
+    # 确保模型处于评估模式
+    model.eval()
 
+    # 设备信息
+    device = next(model.parameters()).device
+    X = torch.tensor(X, dtype=torch.float32).to(device)  # 将输入数据转为 Tensor 并移动到设备上
+
+    # 找到倒数第4层
+    layers = list(model.children())
+    target_layer = layers[-4]
+
+    # 定义从倒数第4层获取输出的辅助函数
+    class RepresentationExtractor(torch.nn.Module):
+        def __init__(self, base_model, target_layer):
+            super().__init__()
+            self.features = torch.nn.Sequential(*list(base_model.children())[:layers.index(target_layer) + 1])
+
+        def forward(self, x):
+            return self.features(x)
+
+    extractor = RepresentationExtractor(model, target_layer).to(device)
+
+    # 计算输出维度
+    with torch.no_grad():
+        sample_output = extractor(X[:1])
+        output_dim = sample_output.shape[-1]
+
+    # 批次处理
     n_batches = int(np.ceil(X.shape[0] / float(batch_size)))
-    output = np.zeros(shape=(len(X), output_dim))
-    for i in range(n_batches):
-        output[i * batch_size:(i + 1) * batch_size] = \
-            get_encoding([X[i * batch_size:(i + 1) * batch_size], 0])[0]
+    output = np.zeros((len(X), output_dim))
+    with torch.no_grad():
+        for i in range(n_batches):
+            batch_X = X[i * batch_size:(i + 1) * batch_size]
+            output[i * batch_size:(i + 1) * batch_size] = extractor(batch_X).cpu().numpy()
 
     return output
 
+
 def get_layer_wise_activations(model, dataset):
     """
-    Get the deep activation outputs.
-    :param model:
-    :param dataset: 'mnist', 'cifar', 'svhn', has different submanifolds architectures  
-    :return: 
+    获取深度激活输出。
+    :param model: PyTorch 模型。
+    :param dataset: 数据集类型，'mnist'、'cifar' 或 'svhn'，不同数据集的架构可能不同。
+    :return: 每层激活的列表。
     """
     assert dataset in ['mnist', 'cifar', 'svhn'], \
-        "dataset parameter must be either 'mnist' 'cifar' or 'svhn'"
-    if dataset == 'mnist':
-        # mnist model
-        acts = [model.layers[0].input]
-        acts.extend([layer.output for layer in model.layers])
-    elif dataset == 'cifar':
-        # cifar-10 model
-        acts = [model.layers[0].input]
-        acts.extend([layer.output for layer in model.layers])
-    else:
-        # svhn model
-        acts = [model.layers[0].input]
-        acts.extend([layer.output for layer in model.layers])
+        "dataset 参数必须是 'mnist', 'cifar' 或 'svhn'"
+
+    # 遍历模型的所有层，收集输入和输出
+    acts = []
+    acts.append("Input")  # 输入层标识（可以替换为实际输入数据的形状）
+
+    # 遍历模型的所有子模块，记录输出
+    for layer in model.children():
+        acts.append(layer)
+
     return acts
 
 # lid of a single query point x
@@ -403,89 +451,79 @@ def mle_single(data, x, k=20):
     return a[0]
 
 # lid of a batch of query points X
-def mle_batch(data, batch, k):
-    data = np.asarray(data, dtype=np.float32)
-    batch = np.asarray(batch, dtype=np.float32)
+def mle_batch(base, neighbors, k):
+    """
+    Maximum Likelihood Estimation (MLE) of local intrinsic dimensionality.
+    :param base: Base points.
+    :param neighbors: Neighbor points.
+    :param k: Number of nearest neighbors.
+    :return: LID estimates.
+    """
+    # Compute pairwise distances
+    distances = np.linalg.norm(base[:, None] - neighbors[None, :], axis=2)
+    distances = np.sort(distances, axis=1)[:, :k]
+    # MLE for LID
+    r = distances[:, -1] / distances[:, :-1]
+    return -1 / np.mean(np.log(r + 1e-10), axis=1)
 
-    k = min(k, len(data)-1)
-    f = lambda v: - k / np.sum(np.log(v/v[-1]))
-    a = cdist(batch, data)
-    a = np.apply_along_axis(np.sort, axis=1, arr=a)[:,1:k+1]
-    a = np.apply_along_axis(f, axis=1, arr=a)
-    return a
 
-# mean distance of x to its k nearest neighbours
-def kmean_batch(data, batch, k):
-    data = np.asarray(data, dtype=np.float32)
-    batch = np.asarray(batch, dtype=np.float32)
-
-    k = min(k, len(data)-1)
-    f = lambda v: np.mean(v)
-    a = cdist(batch, data)
-    a = np.apply_along_axis(np.sort, axis=1, arr=a)[:,1:k+1]
-    a = np.apply_along_axis(f, axis=1, arr=a)
-    return a
-
-# mean distance of x to its k nearest neighbours
-def kmean_pca_batch(data, batch, k=10):
-    data = np.asarray(data, dtype=np.float32)
-    batch = np.asarray(batch, dtype=np.float32)
-    a = np.zeros(batch.shape[0])
-    for i in np.arange(batch.shape[0]):
-        tmp = np.concatenate((data, [batch[i]]))
-        tmp_pca = PCA(n_components=2).fit_transform(tmp)
-        a[i] = kmean_batch(tmp_pca[:-1], tmp_pca[-1], k=k)
-    return a
-
-def get_lids_random_batch(model, X, X_noisy, X_adv, dataset, k=10, batch_size=100):
+def get_lids_random_batch(model, X, X_noisy, X_adv, device, k=10, batch_size=100):
     """
     Get the local intrinsic dimensionality of each Xi in X_adv
-    estimated by k close neighbours in the random batch it lies in.
-    :param model:
-    :param X: normal images
-    :param X_noisy: noisy images
-    :param X_adv: advserial images    
-    :param dataset: 'mnist', 'cifar', 'svhn', has different DNN architectures  
-    :param k: the number of nearest neighbours for LID estimation  
-    :param batch_size: default 100
-    :return: lids: LID of normal images of shape (num_examples, lid_dim)
-            lids_adv: LID of advs images of shape (num_examples, lid_dim)
+    estimated by k close neighbors in the random batch it lies in.
+    :param model: PyTorch model.
+    :param X: Normal images.
+    :param X_noisy: Noisy images.
+    :param X_adv: Adversarial images.
+    :param device: Device ('cpu' or 'cuda').
+    :param k: Number of nearest neighbors for LID estimation.
+    :param batch_size: Batch size (default 100).
+    :return: lids, lids_noisy, lids_adv.
     """
-    # get deep representations
-    funcs = [K.function([model.layers[0].input, K.learning_phase()], [out])
-                 for out in get_layer_wise_activations(model, dataset)]
-    lid_dim = len(funcs)
+    model = model.to(device).eval()
+    lid_dim = len(list(model.children()))  # Number of layers
     print("Number of layers to estimate: ", lid_dim)
 
     def estimate(i_batch):
         start = i_batch * batch_size
-        end = np.minimum(len(X), (i_batch + 1) * batch_size)
+        end = min(len(X), (i_batch + 1) * batch_size)
         n_feed = end - start
-        lid_batch = np.zeros(shape=(n_feed, lid_dim))
-        lid_batch_adv = np.zeros(shape=(n_feed, lid_dim))
-        lid_batch_noisy = np.zeros(shape=(n_feed, lid_dim))
-        for i, func in enumerate(funcs):
-            X_act = func([X[start:end], 0])[0]
-            X_act = np.asarray(X_act, dtype=np.float32).reshape((n_feed, -1))
-            # print("X_act: ", X_act.shape)
 
-            X_adv_act = func([X_adv[start:end], 0])[0]
-            X_adv_act = np.asarray(X_adv_act, dtype=np.float32).reshape((n_feed, -1))
-            # print("X_adv_act: ", X_adv_act.shape)
+        # Select batch data
+        X_batch = X[start:end].to(device)
+        X_noisy_batch = X_noisy[start:end].to(device)
+        X_adv_batch = X_adv[start:end].to(device)
 
-            X_noisy_act = func([X_noisy[start:end], 0])[0]
-            X_noisy_act = np.asarray(X_noisy_act, dtype=np.float32).reshape((n_feed, -1))
-            # print("X_noisy_act: ", X_noisy_act.shape)
+        lid_batch = np.zeros((n_feed, lid_dim))
+        lid_batch_adv = np.zeros((n_feed, lid_dim))
+        lid_batch_noisy = np.zeros((n_feed, lid_dim))
 
-            # random clean samples
-            # Maximum likelihood estimation of local intrinsic dimensionality (LID)
-            lid_batch[:, i] = mle_batch(X_act, X_act, k=k)
-            # print("lid_batch: ", lid_batch.shape)
-            lid_batch_adv[:, i] = mle_batch(X_act, X_adv_act, k=k)
-            # print("lid_batch_adv: ", lid_batch_adv.shape)
-            lid_batch_noisy[:, i] = mle_batch(X_act, X_noisy_act, k=k)
-            # print("lid_batch_noisy: ", lid_batch_noisy.shape)
+        # Compute activations for all layers
+        acts = get_layer_wise_activations(model, X_batch, device)
+        acts_noisy = get_layer_wise_activations(model, X_noisy_batch, device)
+        acts_adv = get_layer_wise_activations(model, X_adv_batch, device)
+
+        # Estimate LID for each layer
+        for i in range(lid_dim):
+            lid_batch[:, i] = mle_batch(acts[i], acts[i], k=k)
+            lid_batch_adv[:, i] = mle_batch(acts[i], acts_adv[i], k=k)
+            lid_batch_noisy[:, i] = mle_batch(acts[i], acts_noisy[i], k=k)
+
         return lid_batch, lid_batch_noisy, lid_batch_adv
+
+    lids, lids_noisy, lids_adv = [], [], []
+    n_batches = int(np.ceil(X.shape[0] / float(batch_size)))
+    for i_batch in tqdm(range(n_batches)):
+        lid_batch, lid_batch_noisy, lid_batch_adv = estimate(i_batch)
+        lids.extend(lid_batch)
+        lids_adv.extend(lid_batch_adv)
+        lids_noisy.extend(lid_batch_noisy)
+
+    return (
+        np.asarray(lids, dtype=np.float32),
+        np.asarray(lids_noisy, dtype=np.float32),
+        np.asarray(lids_adv, dtype=np.float32),
+    )
 
     lids = []
     lids_adv = []
@@ -506,83 +544,100 @@ def get_lids_random_batch(model, X, X_noisy, X_adv, dataset, k=10, batch_size=10
 
     return lids, lids_noisy, lids_adv
 
-def get_kmeans_random_batch(model, X, X_noisy, X_adv, dataset, k=10, batch_size=100, pca=False):
+
+
+
+
+# Mean distance of x to its k nearest neighbors
+def kmean_batch(data, batch, k):
+    data = np.asarray(data, dtype=np.float32)
+    batch = np.asarray(batch, dtype=np.float32)
+    k = min(k, len(data) - 1)
+    f = lambda v: np.mean(v)
+    a = cdist(batch, data)
+    a = np.apply_along_axis(np.sort, axis=1, arr=a)[:, 1:k+1]
+    a = np.apply_along_axis(f, axis=1, arr=a)
+    return a
+
+# Mean distance of x to its k nearest neighbors with PCA
+def kmean_pca_batch(data, batch, k=10):
+    data = np.asarray(data, dtype=np.float32)
+    batch = np.asarray(batch, dtype=np.float32)
+    a = np.zeros(batch.shape[0])
+    for i in np.arange(batch.shape[0]):
+        tmp = np.concatenate((data, [batch[i]]))
+        tmp_pca = PCA(n_components=2).fit_transform(tmp)
+        a[i] = kmean_batch(tmp_pca[:-1], tmp_pca[-1], k=k)
+    return a
+
+
+
+def get_kmeans_random_batch(model, X, X_noisy, X_adv, device, k=10, batch_size=100, pca=False):
     """
     Get the mean distance of each Xi in X_adv to its k nearest neighbors.
 
-    :param model:
-    :param X: normal images
-    :param X_noisy: noisy images
-    :param X_adv: advserial images    
-    :param dataset: 'mnist', 'cifar', 'svhn', has different DNN architectures  
-    :param k: the number of nearest neighbours for LID estimation  
-    :param batch_size: default 100
-    :param pca: using pca or not, if True, apply pca to the referenced sample and a 
-            minibatch of normal samples, then compute the knn mean distance of the referenced sample.
-    :return: kms_normal: kmean of normal images (num_examples, 1)
-            kms_noisy: kmean of normal images (num_examples, 1)
-            kms_adv: kmean of adv images (num_examples, 1)
+    :param model: PyTorch model.
+    :param X: Normal images.
+    :param X_noisy: Noisy images.
+    :param X_adv: Adversarial images.
+    :param device: Device ('cpu' or 'cuda').
+    :param k: Number of nearest neighbors for K-means estimation.
+    :param batch_size: Batch size (default 100).
+    :param pca: Whether to apply PCA for distance calculation.
+    :return: kms_normal: K-means of normal images (num_examples, 1)
+            kms_noisy: K-means of noisy images (num_examples, 1)
+            kms_adv: K-means of adversarial images (num_examples, 1)
     """
-    # get deep representations
-    funcs = [K.function([model.layers[0].input, K.learning_phase()], [model.layers[-2].output])]
-    km_dim = len(funcs)
+    model = model.to(device).eval()
+    km_dim = len(list(model.children()))  # Number of layers
     print("Number of layers to use: ", km_dim)
 
     def estimate(i_batch):
         start = i_batch * batch_size
-        end = np.minimum(len(X), (i_batch + 1) * batch_size)
+        end = min(len(X), (i_batch + 1) * batch_size)
         n_feed = end - start
-        km_batch = np.zeros(shape=(n_feed, km_dim))
-        km_batch_adv = np.zeros(shape=(n_feed, km_dim))
-        km_batch_noisy = np.zeros(shape=(n_feed, km_dim))
-        for i, func in enumerate(funcs):
-            X_act = func([X[start:end], 0])[0]
-            X_act = np.asarray(X_act, dtype=np.float32).reshape((n_feed, -1))
-            # print("X_act: ", X_act.shape)
 
-            X_adv_act = func([X_adv[start:end], 0])[0]
-            X_adv_act = np.asarray(X_adv_act, dtype=np.float32).reshape((n_feed, -1))
-            # print("X_adv_act: ", X_adv_act.shape)
+        # Select batch data
+        X_batch = X[start:end].to(device)
+        X_noisy_batch = X_noisy[start:end].to(device)
+        X_adv_batch = X_adv[start:end].to(device)
 
-            X_noisy_act = func([X_noisy[start:end], 0])[0]
-            X_noisy_act = np.asarray(X_noisy_act, dtype=np.float32).reshape((n_feed, -1))
-            # print("X_noisy_act: ", X_noisy_act.shape)
+        km_batch = np.zeros((n_feed, km_dim))
+        km_batch_adv = np.zeros((n_feed, km_dim))
+        km_batch_noisy = np.zeros((n_feed, km_dim))
 
-            # Maximum likelihood estimation of local intrinsic dimensionality (LID)
+        # Compute activations for all layers
+        acts = get_layer_wise_activations(model, X_batch, device)
+        acts_noisy = get_layer_wise_activations(model, X_noisy_batch, device)
+        acts_adv = get_layer_wise_activations(model, X_adv_batch, device)
+
+        # Estimate K-means for each layer
+        for i in range(km_dim):
             if pca:
-                km_batch[:, i] = kmean_pca_batch(X_act, X_act, k=k)
+                km_batch[:, i] = kmean_pca_batch(acts[i], acts[i], k=k)
             else:
-                km_batch[:, i] = kmean_batch(X_act, X_act, k=k)
-            # print("lid_batch: ", lid_batch.shape)
+                km_batch[:, i] = kmean_batch(acts[i], acts[i], k=k)
             if pca:
-                km_batch_adv[:, i] = kmean_pca_batch(X_act, X_adv_act, k=k)
+                km_batch_adv[:, i] = kmean_pca_batch(acts[i], acts_adv[i], k=k)
             else:
-                km_batch_adv[:, i] = kmean_batch(X_act, X_adv_act, k=k)
-            # print("lid_batch_adv: ", lid_batch_adv.shape)
+                km_batch_adv[:, i] = kmean_batch(acts[i], acts_adv[i], k=k)
             if pca:
-                km_batch_noisy[:, i] = kmean_pca_batch(X_act, X_noisy_act, k=k)
+                km_batch_noisy[:, i] = kmean_pca_batch(acts[i], acts_noisy[i], k=k)
             else:
-                km_batch_noisy[:, i] = kmean_batch(X_act, X_noisy_act, k=k)
-                # print("lid_batch_noisy: ", lid_batch_noisy.shape)
+                km_batch_noisy[:, i] = kmean_batch(acts[i], acts_noisy[i], k=k)
+
         return km_batch, km_batch_noisy, km_batch_adv
 
-    kms = []
-    kms_adv = []
-    kms_noisy = []
+    kms, kms_adv, kms_noisy = [], [], []
     n_batches = int(np.ceil(X.shape[0] / float(batch_size)))
     for i_batch in tqdm(range(n_batches)):
         km_batch, km_batch_noisy, km_batch_adv = estimate(i_batch)
         kms.extend(km_batch)
         kms_adv.extend(km_batch_adv)
         kms_noisy.extend(km_batch_noisy)
-        # print("kms: ", kms.shape)
-        # print("kms_adv: ", kms_noisy.shape)
-        # print("kms_noisy: ", kms_noisy.shape)
-
     kms = np.asarray(kms, dtype=np.float32)
-    kms_noisy = np.asarray(kms_noisy, dtype=np.float32)
-    kms_adv = np.asarray(kms_adv, dtype=np.float32)
-
+    kms_noisy=  np.asarray(kms_noisy, dtype=np.float32)
+    kms_adv = np.asarray(kms_noisy, dtype=np.float32)
     return kms, kms_noisy, kms_adv
 
 def score_point(tup):
