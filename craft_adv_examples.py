@@ -21,7 +21,7 @@ ATTACK_PARAMS = {
 
 CLIP_MIN = -0.5
 CLIP_MAX = 0.5
-PATH_DATA = "data/"
+PATH_DATA = "./data/"
 
 def evaluate_model(model: nn.Module, 
                   x: torch.Tensor, 
