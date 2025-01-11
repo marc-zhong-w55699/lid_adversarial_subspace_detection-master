@@ -4,59 +4,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+from util import get_data, get_model
 
-# Define a simple function to get data
-def get_data(dataset, batch_size):
-    if dataset == 'mnist':
-        transform = transforms.Compose([
-            transforms.RandomRotation(20),
-            transforms.RandomResizedCrop(28, scale=(0.8, 1.0)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5,), (0.5,))
-        ])
-        train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-        test_dataset = datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor(), download=True)
-    elif dataset == 'cifar':
-        transform = transforms.Compose([
-            transforms.RandomRotation(20),
-            transforms.RandomResizedCrop(32, scale=(0.8, 1.0)),
-            transforms.RandomHorizontalFlip(),
-            transforms.ToTensor(),
-            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-        train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
-        test_dataset = datasets.CIFAR10(root='./data', train=False, transform=transforms.ToTensor(), download=True)
-    else:
-        raise ValueError("Unsupported dataset. Choose 'mnist' or 'cifar'.")
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
-    return train_loader, test_loader
-
-# Define a simple model
-def get_model(dataset):
-    if dataset == 'mnist':
-        model = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(28 * 28, 128),
-            nn.ReLU(),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 10)
-        )
-    elif dataset == 'cifar':
-        model = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(32 * 32 * 3, 256),
-            nn.ReLU(),
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 10)
-        )
-    else:
-        raise ValueError("Unsupported dataset. Choose 'mnist' or 'cifar'.")
-    return model
 
 # Training function
 def train(dataset='mnist', batch_size=128, epochs=50):
