@@ -63,7 +63,20 @@ def get_data(dataset, batch_size):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
-
+def extract_test_data(test_loader):
+    x_test = []
+    y_test = []
+    
+    # 遍历 DataLoader
+    for inputs, labels in test_loader:
+        x_test.append(inputs)
+        y_test.append(labels)
+    
+    # 将所有批次合并为一个 Tensor
+    x_test = torch.cat(x_test, dim=0)
+    y_test = torch.cat(y_test, dim=0)
+    
+    return x_test, y_test
 
 def get_model(dataset='mnist', softmax=True):
     """
