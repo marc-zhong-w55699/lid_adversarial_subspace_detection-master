@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing import Dict, Tuple, Optional
 
-from util import get_data, get_model  # assuming these are converted to PyTorch
+from util import get_data, get_model , extract_test_data
 from attacks import fgsm, basic_iterative_method, saliency_map_method
 from cw_attacks import CarliniL2, CarliniLID  # assuming these are converted to PyTorch
 
@@ -175,7 +175,8 @@ def main(args):
     model.eval()
     
     # Load test data
-    _, _, x_test, y_test = get_data(args.dataset,args.batch_size)
+    train_loader, test_loader  = get_data(args.dataset,args.batch_size)
+    x_test, y_test = extract_test_data(test_loader)
     x_test = torch.FloatTensor(x_test).to(device)
     y_test = torch.FloatTensor(y_test).to(device)
     
