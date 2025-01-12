@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 from sklearn.neighbors import KernelDensity
 from torchvision import datasets, transforms
 import numpy as np
+from util import get_data, extract_data
 from util import (get_data, get_noisy_samples, get_mc_predictions,
                   get_deep_representations, score_samples, normalize,
                   get_lids_random_batch, get_kmeans_random_batch)
@@ -239,7 +240,9 @@ def main(args):
     # Load the model
     model = torch.load(model_file)
     # Load the dataset
-    X_train, Y_train, X_test, Y_test = get_data(args.dataset, args.batch_size)
+    train_loader, test_loader  = get_data(args.dataset,args.batch_size)
+    # 提取数据
+    X_train, Y_train, X_test, Y_test = extract_data(train_loader, test_loader)
     # Check attack type, select adversarial and noisy samples accordingly
     print('Loading noisy and adversarial samples...')
     if args.attack == 'all':
