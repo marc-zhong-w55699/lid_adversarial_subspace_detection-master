@@ -352,7 +352,7 @@ def main(args):
 
     # Refine the normal, noisy and adversarial sets to only include samples for
     # which the original version was correctly classified by the model
-    preds_test = predict(model, X_test, batch_size=args.batch_size, device=device)
+    preds_test = model_predict(model, X_test, batch_size=args.batch_size, device=device)
     inds_correct = np.where(preds_test == Y_test.argmax(axis=1))[0]
     print("Number of correctly predict images: %s" % (len(inds_correct)))
 
