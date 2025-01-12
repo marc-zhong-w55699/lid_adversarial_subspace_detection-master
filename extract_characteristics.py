@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from sklearn.neighbors import KernelDensity
 from torchvision import datasets, transforms
 import numpy as np
-from util import get_data, extract_data
+from util import get_data, extract_data, get_model
 from util import (get_data, get_noisy_samples, get_mc_predictions,
                   get_deep_representations, score_samples, normalize,
                   get_lids_random_batch, get_kmeans_random_batch)
