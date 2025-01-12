@@ -488,25 +488,35 @@ def get_deep_representations(model, X, batch_size=256):
     return output
 
 
-def get_layer_wise_activations(model, dataset):
+def get_layer_wise_activations(model, inputs, device):
     """
-    获取深度激活输出。
-    :param model: PyTorch 模型。
-    :param dataset: 数据集类型，'mnist'、'cifar' 或 'svhn'，不同数据集的架构可能不同。
-    :return: 每层激活的列表。
+    Get the activations of each layer in the model for the given inputs.
+
+    :param model: PyTorch model.
+    :param inputs: Input tensor (batch of data).
+    :param device: Device ('cpu' or 'cuda').
+    :return: List of activations, one for each layer.
     """
-    assert dataset in ['mnist', 'cifar', 'svhn'], \
-        "dataset 参数必须是 'mnist', 'cifar' 或 'svhn'"
+    activations = []
+    hooks = []
 
-    # 遍历模型的所有层，收集输入和输出
-    acts = []
-    acts.append("Input")  # 输入层标识（可以替换为实际输入数据的形状）
+    # Hook function to capture outputs of each layer
+    def hook_fn(module, input, output):
+        activations.append(output.detach().to(device))
 
-    # 遍历模型的所有子模块，记录输出
+    # Register hooks on all layers
     for layer in model.children():
-        acts.append(layer)
+        hooks.append(layer.register_forward_hook(hook_fn))
 
-    return acts
+    # Perform a forward pass to collect activations
+    with torch.no_grad():
+        _ = model(inputs.to(device))
+
+    # Remove hooks to clean up
+    for hook in hooks:
+        hook.remove()
+
+    return activations
 
 # lid of a single query point x
 def mle_single(data, x, k=20):
@@ -564,9 +574,9 @@ def get_lids_random_batch(model, X, X_noisy, X_adv, device, k=10, batch_size=100
         n_feed = end - start
 
         # Select batch data
-        X_batch = X[start:end].to(device)
-        X_noisy_batch = X_noisy[start:end].to(device)
-        X_adv_batch = X_adv[start:end].to(device)
+        X_batch = X[start:end]
+        X_noisy_batch = X_noisy[start:end]
+        X_adv_batch = X_adv[start:end]
 
         lid_batch = np.zeros((n_feed, lid_dim))
         lid_batch_adv = np.zeros((n_feed, lid_dim))
