@@ -344,7 +344,7 @@ def main(args):
         if not s_type == 'normal':
             l2_diff = np.linalg.norm(
                 data.reshape((len(data), -1)) -
-                Y_test.reshape((len(Y_test), -1)),
+                Y_test.reshape((len(X_test), -1)),
                 axis=1
             ).mean()
             print("Average L-2 perturbation size of the %s test set: %0.2f" %
