@@ -497,6 +497,7 @@ def get_layer_wise_activations(model, inputs, device):
     :param device: Device ('cpu' or 'cuda').
     :return: List of activations, one for each layer.
     """
+    inputs = inputs.to(device, dtype=torch.float32)
     activations = []
     hooks = []
 
@@ -510,7 +511,7 @@ def get_layer_wise_activations(model, inputs, device):
 
     # Perform a forward pass to collect activations
     with torch.no_grad():
-        _ = model(inputs.to(device))
+        _ = model(inputs)
 
     # Remove hooks to clean up
     for hook in hooks:
