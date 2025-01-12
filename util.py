@@ -38,32 +38,102 @@ np.random.seed(0)
 torch.manual_seed(0)
 
 def get_data(dataset, batch_size):
+    """
+    加载指定数据集并返回训练集和测试集的 DataLoader。
+    如果数据文件已存在，不会重复下载。
+
+    Args:
+        dataset (str): 数据集名称，支持 'mnist'、'cifar'、'svhn'。
+        batch_size (int): 每个批次的大小。
+
+    Returns:
+        tuple: (train_loader, test_loader)
+    """
     if dataset == 'mnist':
-        transform = transforms.Compose([
+        transform_train = transforms.Compose([
             transforms.RandomRotation(20),
             transforms.RandomResizedCrop(28, scale=(0.8, 1.0)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,))
         ])
-        train_dataset = datasets.MNIST(root='./data', train=True, transform=transform, download=True)
-        test_dataset = datasets.MNIST(root='./data', train=False, transform=transforms.ToTensor(), download=True)
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,))
+        ])
+        root_dir = './data/mnist'
+        train_dataset = datasets.MNIST(root=root_dir, train=True, transform=transform_train, download=not os.path.exists(root_dir))
+        test_dataset = datasets.MNIST(root=root_dir, train=False, transform=transform_test, download=not os.path.exists(root_dir))
+
     elif dataset == 'cifar':
-        transform = transforms.Compose([
+        transform_train = transforms.Compose([
             transforms.RandomRotation(20),
             transforms.RandomResizedCrop(32, scale=(0.8, 1.0)),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
-        train_dataset = datasets.CIFAR10(root='./data', train=True, transform=transform, download=True)
-        test_dataset = datasets.CIFAR10(root='./data', train=False, transform=transforms.ToTensor(), download=True)
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        root_dir = './data/cifar10'
+        train_dataset = datasets.CIFAR10(root=root_dir, train=True, transform=transform_train, download=not os.path.exists(root_dir))
+        test_dataset = datasets.CIFAR10(root=root_dir, train=False, transform=transform_test, download=not os.path.exists(root_dir))
+
+    elif dataset == 'svhn':
+        transform = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        root_dir = './data/svhn'
+        train_dataset = datasets.SVHN(root=root_dir, split='train', transform=transform, download=not os.path.exists(root_dir))
+        test_dataset = datasets.SVHN(root=root_dir, split='test', transform=transform, download=not os.path.exists(root_dir))
+
     else:
-        raise ValueError("Unsupported dataset. Choose 'mnist' or 'cifar'.")
+        raise ValueError("Unsupported dataset. Choose 'mnist', 'cifar', or 'svhn'.")
+
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
     return train_loader, test_loader
 
+def extract_data(train_loader, test_loader):
+    """
+    从 DataLoader 提取完整的训练和测试数据。
+
+    Args:
+        train_loader (DataLoader): 训练数据的 DataLoader。
+        test_loader (DataLoader): 测试数据的 DataLoader。
+
+    Returns:
+        tuple: (X_train, Y_train, X_test, Y_test)
+            - X_train, X_test: 张量形式的输入数据 (N, C, H, W)。
+            - Y_train, Y_test: 张量形式的独热编码标签 (N, num_classes)。
+    """
+    def extract(loader):
+        X, Y = [], []
+        for batch_x, batch_y in loader:
+            X.append(batch_x)
+            Y.append(batch_y)
+        # 合并所有批次的数据
+        X = torch.cat(X, dim=0)
+        Y = torch.cat(Y, dim=0)
+        return X, Y
+
+    # 提取训练和测试数据
+    X_train, Y_train_raw = extract(train_loader)
+    X_test, Y_test_raw = extract(test_loader)
+
+    # 获取类别数（假设标签从 0 开始）
+    num_classes = max(Y_train_raw.max(), Y_test_raw.max()) + 1
+
+    # 将标签转换为独热编码格式
+    Y_train = torch.nn.functional.one_hot(Y_train_raw, num_classes=num_classes).float()
+    Y_test = torch.nn.functional.one_hot(Y_test_raw, num_classes=num_classes).float()
+
+    return X_train, Y_train, X_test, Y_test
+    
 def extract_test_data(dataset,test_loader):
     """
     提取测试数据并转换为适合模型输入的格式。
