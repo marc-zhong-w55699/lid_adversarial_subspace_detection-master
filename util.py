@@ -554,7 +554,7 @@ def get_lids_random_batch(model, X, X_noisy, X_adv, device, k=10, batch_size=100
     :param batch_size: Batch size (default 100).
     :return: lids, lids_noisy, lids_adv.
     """
-    model = model.to(device).eval()
+    #model = model.to(device).eval()
     lid_dim = len(list(model.children()))  # Number of layers
     print("Number of layers to estimate: ", lid_dim)
 
