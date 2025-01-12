@@ -50,7 +50,35 @@ def merge_and_generate_labels(X_pos, X_neg):
     y = y.view(X.size(0), 1)
 
     return X, y
-
+def evaluate_model(model: nn.Module, 
+                   x: torch.Tensor, 
+                   y: torch.Tensor, 
+                   batch_size: int) -> float:
+    """Evaluate model accuracy on data."""
+    model.eval()
+    device = next(model.parameters()).device
+    dataloader = DataLoader(list(zip(x, y)), batch_size=batch_size)
+    
+    correct = 0
+    total = 0
+    
+    with torch.no_grad():
+        for batch_x, batch_y in dataloader:
+            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+            outputs = model(batch_x)
+            _, predicted = outputs.max(1)
+            
+            # 根据 batch_y 的维度决定如何处理
+            if batch_y.ndim == 2:  # 如果是独热编码
+                correct += (predicted == batch_y.argmax(1)).sum().item()
+            elif batch_y.ndim == 1:  # 如果是类别索引
+                correct += (predicted == batch_y).sum().item()
+            else:
+                raise ValueError(f"Unexpected shape for batch_y: {batch_y.shape}")
+            
+            total += batch_y.size(0)
+    
+    return correct / total
 def get_kd(model, X_train, Y_train, X_test, X_test_noisy, X_test_adv, batch_size):
     """
     Get kernel density scores.
@@ -269,8 +297,8 @@ def main(args):
     # Check model accuracies on each sample type
     for s_type, dataset in zip(['normal', 'noisy', 'adversarial'],
                                [X_test, X_test_noisy, X_test_adv]):
-        _, acc = model.evaluate(dataset, Y_test, batch_size=args.batch_size,
-                                verbose=0)
+        
+        acc = evaluate_model(model, X_test, Y_test, args.batch_size)
         print("Model accuracy on the %s test set: %0.2f%%" %
               (s_type, 100 * acc))
         # Compute and display average perturbation sizes
