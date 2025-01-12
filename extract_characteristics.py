@@ -79,6 +79,34 @@ def evaluate_model(model: nn.Module,
             total += batch_y.size(0)
     
     return correct / total
+def model_predict(model, X, batch_size=256, device='cuda' if torch.cuda.is_available() else 'cpu'):
+    """
+    Perform predictions on the given data.
+
+    :param model: PyTorch model
+    :param X: Input data as a PyTorch tensor
+    :param batch_size: Number of samples per batch for prediction
+    :param device: Device to use for prediction ('cuda' or 'cpu')
+    :return: Predicted class indices as a NumPy array
+    """
+    model.to(device)  # Move model to the specified device
+    model.eval()  # Set model to evaluation mode
+    
+    # Ensure input tensor is on the same device
+    X = X.to(device)
+    predictions = []
+
+    # Disable gradient computation for prediction
+    with torch.no_grad():
+        for i in range(0, len(X), batch_size):
+            batch = X[i:i+batch_size]
+            outputs = model(batch)  # Forward pass
+            # Convert logits to predicted class indices
+            preds = torch.argmax(outputs, dim=1)
+            predictions.append(preds.cpu())  # Move to CPU for concatenation
+    predictions = torch.cat(predictions).numpy()
+    # Combine predictions from all batches
+    return predictions
 def get_kd(model, X_train, Y_train, X_test, X_test_noisy, X_test_adv, batch_size):
     """
     Get kernel density scores.
@@ -324,8 +352,7 @@ def main(args):
 
     # Refine the normal, noisy and adversarial sets to only include samples for
     # which the original version was correctly classified by the model
-    preds_test = model.predict_classes(X_test, verbose=0,
-                                       batch_size=args.batch_size)
+    preds_test = predict(model, X_test, batch_size=args.batch_size, device=device)
     inds_correct = np.where(preds_test == Y_test.argmax(axis=1))[0]
     print("Number of correctly predict images: %s" % (len(inds_correct)))
 
