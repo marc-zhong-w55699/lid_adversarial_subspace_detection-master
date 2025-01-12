@@ -55,6 +55,7 @@ def evaluate_model(model: nn.Module,
                    y: torch.Tensor, 
                    batch_size: int) -> float:
     """Evaluate model accuracy on data."""
+    x = x.to(dtype=torch.float32)
     model.eval()
     device = next(model.parameters()).device
     dataloader = DataLoader(list(zip(x, y)), batch_size=batch_size)
