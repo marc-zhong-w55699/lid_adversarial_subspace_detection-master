@@ -333,10 +333,10 @@ def main(args):
             np.save(noisy_file, X_test_noisy)
 
     # Check model accuracies on each sample type
-    for s_type, dataset in zip(['normal', 'noisy', 'adversarial'],
+    for s_type, data in zip(['normal', 'noisy', 'adversarial'],
                                [X_test, X_test_noisy, X_test_adv]):
         
-        acc = evaluate_model(model, dataset, Y_test, args.batch_size)
+        acc = evaluate_model(model, data, Y_test, args.batch_size)
         print("Model accuracy on the %s test set: %0.2f%%" %
               (s_type, 100 * acc))
         # Compute and display average perturbation sizes
