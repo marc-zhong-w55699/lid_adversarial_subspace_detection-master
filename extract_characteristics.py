@@ -266,7 +266,16 @@ def main(args):
 
     print('Loading the data and model...')
     # Load the model
-    model = torch.load(model_file)
+    
+    if args.attack in ['cw-l2', 'cw-lid']:
+        warnings.warn("Important: remove the softmax layer for cw attacks!")
+        model = get_model(args.dataset, softmax=False)
+    else:
+        model = get_model(args.dataset)
+    
+    model.load_state_dict(torch.load(model_file))
+    model = model.to(device)
+    model.eval()
     # Load the dataset
     train_loader, test_loader  = get_data(args.dataset,args.batch_size)
     # 提取数据
