@@ -265,6 +265,8 @@ def main(args):
         'samples using craft_adv_samples.py'
 
     print('Loading the data and model...')
+     # Set device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # Load the model
     
     if args.attack in ['cw-l2', 'cw-lid']:
