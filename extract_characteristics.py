@@ -208,7 +208,7 @@ def get_bu(model, X_test, X_test_noisy, X_test_adv):
 
     return artifacts, labels
 
-def get_lid(model, X_test, X_test_noisy, X_test_adv, k=10, batch_size=100, dataset='mnist'):
+def get_lid(model, X_test, X_test_noisy, X_test_adv,device, k=10, batch_size=100):
     """
     Get local intrinsic dimensionality
     :param model: 
@@ -221,8 +221,7 @@ def get_lid(model, X_test, X_test_noisy, X_test_adv, k=10, batch_size=100, datas
             labels: adversarial (label: 1) and normal/noisy (label: 0) examples
     """
     print('Extract local intrinsic dimensionality: k = %s' % k)
-    lids_normal, lids_noisy, lids_adv = get_lids_random_batch(model, X_test, X_test_noisy,
-                                                              X_test_adv, dataset, k, batch_size)
+    lids_normal, lids_noisy, lids_adv = get_lids_random_batch((model, X, X_noisy, X_adv, device, k=10, batch_size=100)
     print("lids_normal:", lids_normal.shape)
     print("lids_noisy:", lids_noisy.shape)
     print("lids_adv:", lids_adv.shape)
@@ -384,8 +383,9 @@ def main(args):
         np.save(file_name, data)
     elif args.characteristic == 'lid':
         # extract local intrinsic dimensionality
-        characteristics, labels = get_lid(model, X_test, X_test_noisy, X_test_adv,
-                                    args.k_nearest, args.batch_size, args.dataset)
+      
+        characteristics, labels = get_lid(model, X_test, X_test_noisy, X_test_adv,device,
+                                    args.k_nearest, args.batch_size)
         print("LID: [characteristic shape: ", characteristics.shape, ", label shape: ", labels.shape)
 
         # save to file
