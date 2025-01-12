@@ -227,10 +227,10 @@ def main(args):
         "'jsma' or 'cw-l2'"
     assert args.characteristic in ['kd', 'bu', 'lid', 'km', 'all'], \
         "Characteristic(s) to use 'kd', 'bu', 'lid', 'km', 'all'"
-    model_file = os.path.join(PATH_DATA, "model_%s.h5" % args.dataset)
+    model_file = os.path.join(PATH_DATA, "model_%s.pth" % args.dataset)
     assert os.path.isfile(model_file), \
         'model file not found... must first train model using train_model.py.'
-    adv_file = os.path.join(PATH_DATA, "Adv_%s_%s.npy" % (args.dataset, args.attack))
+    adv_file = os.path.join(PATH_DATA, "Adv_%s_%s.pt" % (args.dataset, args.attack))
     assert os.path.isfile(adv_file), \
         'adversarial sample file not found... must first craft adversarial ' \
         'samples using craft_adv_samples.py'
