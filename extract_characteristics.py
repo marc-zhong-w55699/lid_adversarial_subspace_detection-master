@@ -221,7 +221,7 @@ def get_lid(model, X_test, X_test_noisy, X_test_adv,device, k=10, batch_size=100
             labels: adversarial (label: 1) and normal/noisy (label: 0) examples
     """
     print('Extract local intrinsic dimensionality: k = %s' % k)
-    lids_normal, lids_noisy, lids_adv = get_lids_random_batch((model, X, X_noisy, X_adv, device, k=10, batch_size=100)
+    lids_normal, lids_noisy, lids_adv = get_lids_random_batch(model, X_test, X_test_noisy, X_test_adv,device, k,batch_size)
     print("lids_normal:", lids_normal.shape)
     print("lids_noisy:", lids_noisy.shape)
     print("lids_adv:", lids_adv.shape)
