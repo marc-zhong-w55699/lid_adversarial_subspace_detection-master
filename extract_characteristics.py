@@ -252,7 +252,7 @@ def main(args):
         raise NotImplementedError("'All' types detector not yet implemented.")
     else:
         # Load adversarial samples
-        X_test_adv = np.load(adv_file)
+        X_test_adv = torch.load(adv_file)
         print("X_test_adv: ", X_test_adv.shape)
 
         # as there are some parameters to tune for noisy example, so put the generation
